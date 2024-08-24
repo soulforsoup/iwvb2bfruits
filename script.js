@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Replace with your Google Spreadsheet ID and API key
     const googleSpreadsheetId = '1TF2hAiXg5KfLARRnVSdT0YroW3su0f3K-iERs2RZjAw';
     const apiKey = 'AIzaSyBn1cNKwaNPl9WeK8_gQtU0p8ieBg0pUjQ';
-    const sheetName = 'Sheet1'; // Replace with your sheet name
+    const sheetName = 'fruits'; // Replace with your sheet name
     const googleSheetUrl = `https://sheets.googleapis.com/v4/spreadsheets/${googleSpreadsheetId}/values/${sheetName}!A1:D?key=${apiKey}`;
 
     // Fetch data from Google Sheet
