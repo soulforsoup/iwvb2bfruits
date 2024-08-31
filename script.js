@@ -11,17 +11,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMessage = document.getElementById("errorMessage");
   const backToTopButton = document.getElementById("backToTop");
   const noResultsMessage = document.getElementById("noResults");
+  const copyToClipboardBtn = document.getElementById("copyToClipboard");
 
   let allProducts = [];
   let currentSortColumn = null;
   let isAscending = true;
   let currentSearchTerm = "";
   let isPreparingPrint = false;
+  let selectedProducts = new Map(); // Store selected products and their quantities
 
-  // Show loading spinner
   loadingSpinner.style.display = "block";
 
-  // Fetch data from products.json
   fetch("products.json")
     .then((response) => {
       if (!response.ok) {
@@ -50,7 +50,6 @@ document.addEventListener("DOMContentLoaded", () => {
     removeAnimationClasses();
     let displayedProducts = allProducts;
 
-    // Apply search filter
     if (currentSearchTerm) {
       displayedProducts = displayedProducts.filter((product) =>
         product.productName
@@ -59,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    // Apply sort
     if (currentSortColumn) {
       displayedProducts.sort((a, b) => {
         if (currentSortColumn === "indent") {
@@ -99,10 +97,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const fragment = document.createDocumentFragment();
       products.forEach((product) => {
         const row = document.createElement("tr");
+        const isSelected = selectedProducts.has(product.productName);
+        const quantity = isSelected
+          ? selectedProducts.get(product.productName).quantity
+          : 1;
         row.innerHTML = `
+          <td class="checkbox-column no-print">
+            <input type="checkbox" class="product-checkbox" data-product='${JSON.stringify(product)}' ${isSelected ? "checked" : ""}>
+          </td>
           <td>${product.productName}</td>
           <td>${product.unitOfMeasure}</td>
           <td>${product.salesPrice}</td>
+          <td>
+            <input type="number" class="quantity-input" value="${quantity}" min="1" style="width: 50px;">
+          </td>
           <td style="text-align: left !important; padding-left: 20px !important;">${
             product.indent ? "✓" : ""
           }</td>
@@ -111,6 +119,33 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       productTable.appendChild(fragment);
       productTable.classList.add("fade-in");
+      attachEventListeners();
+    }
+  }
+
+  function attachEventListeners() {
+    document.querySelectorAll(".product-checkbox").forEach((checkbox) => {
+      checkbox.addEventListener("change", updateSelectedProducts);
+    });
+
+    document.querySelectorAll(".quantity-input").forEach((input) => {
+      input.addEventListener("change", updateSelectedProducts);
+    });
+  }
+
+  function updateSelectedProducts(event) {
+    const row = event.target.closest("tr");
+    const checkbox = row.querySelector(".product-checkbox");
+    const quantityInput = row.querySelector(".quantity-input");
+    const product = JSON.parse(checkbox.dataset.product);
+
+    if (checkbox.checked) {
+      selectedProducts.set(product.productName, {
+        quantity: parseInt(quantityInput.value, 10) || 1,
+        product: product,
+      });
+    } else {
+      selectedProducts.delete(product.productName);
     }
   }
 
@@ -175,34 +210,19 @@ document.addEventListener("DOMContentLoaded", () => {
   downloadBtn.addEventListener("click", () => {
     if (!isPreparingPrint) {
       isPreparingPrint = true;
-
-      // Store current state
       const originalTableHTML = productTable.innerHTML;
-
-      // Render all products without filters or sorting
       renderProducts(allProducts);
-
-      // Update all dates (including the print date)
       updateAllDates();
-
-      // Temporarily remove dark mode for printing
       const isDarkMode = document.body.classList.contains("dark-mode");
       if (isDarkMode) {
         document.body.classList.remove("dark-mode");
       }
-
-      // Use setTimeout to allow the DOM to update before printing
       setTimeout(() => {
         window.print();
-
-        // After printing, restore the original state
         productTable.innerHTML = originalTableHTML;
-
-        // Restore dark mode if it was active
         if (isDarkMode) {
           document.body.classList.add("dark-mode");
         }
-
         isPreparingPrint = false;
       }, 100);
     }
@@ -262,7 +282,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // New function to update all date elements
   function updateAllDates() {
     const currentDate = getCurrentDate();
     const dateElements = document.querySelectorAll(
@@ -273,8 +292,76 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Call this function when the page loads
   updateAllDates();
+
+  copyToClipboardBtn.addEventListener("click", () => {
+    if (selectedProducts.size === 0) {
+      alert("Please select at least one product.");
+      return;
+    }
+
+    let clipboardText = "🛒 Your Order Summary:\n\n";
+    let totalPrice = 0;
+
+    selectedProducts.forEach(({ quantity, product }, productName) => {
+      const price = parseFloat(product.salesPrice.replace(/[^0-9.-]+/g, ""));
+      const productTotal = price * quantity;
+      totalPrice += productTotal;
+
+      clipboardText += `${product.productName}/${product.unitOfMeasure}: $${price.toFixed(2)}, Quantity: ${quantity}, Total: $${productTotal.toFixed(2)}\n`;
+      clipboardText += "----------------------------------------\n";
+    });
+
+    const shippingPrice = totalPrice < 80 ? 8 : 0;
+    const finalTotal = totalPrice + shippingPrice;
+
+    clipboardText += "\n📦 Shipping Information:\n";
+    if (shippingPrice === 0) {
+      clipboardText += "   • Free Shipping (Order Value above $80)\n";
+    } else {
+      clipboardText +=
+        "   • $8 (Shipping fee applies for order values below $80)\n";
+    }
+
+    clipboardText += "\n💰 Order Summary:\n";
+    clipboardText += `   • Subtotal: $${totalPrice.toFixed(2)}\n`;
+    clipboardText += `   • Shipping: $${shippingPrice.toFixed(2)}\n`;
+    clipboardText += `   • Total: $${finalTotal.toFixed(2)}\n\n`;
+
+    // Add the disclaimer before the thank you message
+    clipboardText +=
+      "⚠️ Disclaimer: The prices listed are estimates for reference only and are subject to changes.\n\n";
+
+    clipboardText +=
+      "Thank you for your order! Please send this text to our WhatsApp for processing.";
+
+    navigator.clipboard
+      .writeText(clipboardText)
+      .then(() => {
+        showCustomAlert();
+      })
+      .catch((err) => {
+        console.error("Failed to copy text: ", err);
+        alert("Failed to copy text. Please try again.");
+      });
+  });
+
+  function showCustomAlert() {
+    const modal = document.getElementById("customAlert");
+    const closeBtn = document.getElementById("closeModal");
+
+    modal.style.display = "block";
+
+    closeBtn.onclick = function () {
+      modal.style.display = "none";
+    };
+
+    window.onclick = function (event) {
+      if (event.target == modal) {
+        modal.style.display = "none";
+      }
+    };
+  }
 });
 
 function getCurrentDate() {
