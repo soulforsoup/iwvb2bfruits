@@ -44,7 +44,7 @@
   {
     "productName": "Apple Custard 番荔枝",
     "unitOfMeasure": "/KG",
-    "salesPrice": "#N/A",
+    "salesPrice": "$17.00",
     "indent": false
   },
   {
@@ -331,7 +331,7 @@
   },
   {
     "productName": "Lemon 柠檬 80/100PCS",
-    "unitOfMeasure": "/KG",
+    "unitOfMeasure": "/CTN",
     "salesPrice": "$42.00",
     "indent": false
   },
